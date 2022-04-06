@@ -298,6 +298,20 @@ md"""The next cell implements the expected count, but the formula is approximate
 # ╔═╡ 12046d80-3d35-46ee-974f-3209bfd4fe4e
 @bind ParValues2 MultiSlider(["p₊"],[0:0.01:1],[0.5],[Float64,Int64,Int64])
 
+# ╔═╡ 93c27874-1b8f-409d-92a3-1835497ea25f
+function GNgen(N, nruns, pup)
+	GN = zeros(Float64,2*N+1)
+
+	#Compute the average and the variance:
+	avg = nruns*(2*pup-1)
+	var = 4*pup*(1-pup)*nruns
+
+	for i in -N:1:N
+		GN[i + (N+1)] = exp(-(x-avg)^2/2/var) / sqrt(2*pi*var)
+	end
+	return GN
+end
+
 # ╔═╡ 9be428da-d8e5-4bf9-8aa4-f8fcf88f29d1
 begin
 	steprange2 = 8:8:64::Int64	
@@ -317,20 +331,6 @@ begin
 		plts[i] = Ps.plot!(x, gauss, seriestype = :line, label = "")
 		plts[i] = Ps.plot!(x, binom, seriestype = :line, label = "")
 	end
-end
-
-# ╔═╡ 93c27874-1b8f-409d-92a3-1835497ea25f
-function GNgen(N, nruns, pup)
-	GN = zeros(Float64,2*N+1)
-
-	#Compute the average and the variance:
-	avg = nruns*(2*pup-1)
-	var = 4*pup*(1-pup)*nruns
-
-	for i in -N:1:N
-		GN[i + (N+1)] = exp(-(x-avg)^2/2/var) / sqrt(2*pi*var)
-	end
-	return GN
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1258,7 +1258,7 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
-# ╟─29850932-aac0-11ec-2223-6b6dea79332d
+# ╠═29850932-aac0-11ec-2223-6b6dea79332d
 # ╟─733fc92a-7723-40b0-b8d3-2defb24a038f
 # ╠═79f6fa94-375d-4d13-b09f-f127e74303b0
 # ╟─bee0e5b3-1ea6-4f20-a1b0-5562c583e64c
