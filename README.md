@@ -1,4 +1,4 @@
-# Computational-Physics-Lab-in-Julia
+# Computational Physics Lab in Julia
 
 This repository contains the exercises from the M.Sc. degree-level course in computational physics _Laboratorio di Fisica Computazionale_ held at the University of Trieste. The language of choice of the lectures is Fortran, but I took this as a chance to study Julia. I am not crediting the professor yet, because they know nothing about this repo as of today.
 
