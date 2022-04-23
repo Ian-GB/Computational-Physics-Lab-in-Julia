@@ -4,351 +4,311 @@
 using Markdown
 using InteractiveUtils
 
-# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
-macro bind(def, element)
-    quote
-        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
-        local el = $(esc(element))
-        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
-        el
-    end
-end
-
-# ╔═╡ 79f6fa94-375d-4d13-b09f-f127e74303b0
+# ╔═╡ d9760870-b70a-11ec-0077-6f8c963524a3
 begin
+	#using Pkg;Pkg.update();Pkg.add("SpecialFunctions")
 	using Random
 	using Formatting
-	import Plots as Ps
-	import PlotThemes
-	Ps.theme(:dark)
-	#import StatsBase as SB
-	#import StatsModels as SM
-	#import GLM as GLM
-	#import LsqFit as LF
-	#import DataFrames as DF
+	using Printf
+	using Plots
+	import StatsBase as SB
+	import LinearAlgebra as LA
+	theme(:ggplot2)
 	using PlutoUI
-	using HypertextLiteral
-	#import LinearAlgebra as LA
-	#import Base
-	#Base.REPLCompletions.latex_symbols["\\_beta"] = "ᵦ"
+	import SpecialFunctions as SF
+	# using LaTeXStrings
 end
 
-# ╔═╡ 29850932-aac0-11ec-2223-6b6dea79332d
+# ╔═╡ 974ba0dc-274e-4cf9-a17a-ea9aee5de4c9
 md"""
 # Laboratorio di fisica computazionale
-## Homework 4
+## Homework 6
 ### Author: Ian Gremese
-#### Unresolved issues:
-- Poorly commented code.
-- Missing (not working) comparison between original formula and gaussian approximation.
-#### Disclaimers:
 """
 
-# ╔═╡ 733fc92a-7723-40b0-b8d3-2defb24a038f
-md"""### Import libraries
-The next cell imports the libraries."""
+# ╔═╡ c96fc5bd-6707-4113-9931-eec0c7d074c7
+md"""The next function generates a random variable distributed uniformly on the interval ``[-1,+1)``."""
 
-# ╔═╡ bee0e5b3-1ea6-4f20-a1b0-5562c583e64c
-md"""The next cell implements the multislider function."""
-
-# ╔═╡ a3b60c52-2e25-4fb9-ba36-620ebc193df8
-function MultiSlider(VarNames,ValRanges,Defaults,VarType)
-	PlutoUI.combine() do Child
-		@htl("""
-		<h6>Parametres</h6>
-		<ul>
-		$([
-			@htl("<li>$(VarNames[inx]): $(Child(VarNames[inx],
-				Slider( #@eval( string(ValRanges[inx])*"::"*string(VarType[inx]) ),
-						ValRanges[inx],
-						default=Defaults[inx],
-						show_value=true)))</li>")
-			for inx in 1:length(VarNames)
-		])
-		</ul>
-		""")
-	end
+# ╔═╡ 1070a66c-ba49-44b0-9920-2a395e780a25
+function unipm1()
+	return 2*rand(Float64)-1
 end
 
-# ╔═╡ bb721a1b-730a-4ac8-9260-1b3e9dc79e69
-md"""The next cell implements the theoretical number of occurrences of each final position in the case of ```nruns``` iterations of the ```N```-step random walk with probability ```pup``` of going in the positive direction with steps of unit length."""
+# ╔═╡ 61cc14f6-33d5-40d9-8fa6-d1e9800d8ff9
+md"""The next function generates a random variable distributed according to ``p(x)=\exp(-x)`` on the interval ``[-1,+1)``."""
 
-# ╔═╡ 18fd5542-d197-4156-8564-847d777de7e1
-function PNgen(N, nruns, pup)
-	PN = zeros(Float64,2*N+1)
-
-	#Compute Pₙ(x) in the case of x = -N
-	prev =  nruns * (1-pup)^N #
-	PN[-N + (N+1)] = prev
-	
-	for i in -N+2:2:N
-		curr = prev * (N-i+2) / (N+i) * pup/(1-pup)
-		PN[i + (N+1)] = curr
-		prev = curr
-		#expect[i+N+1] = nruns * sqrt(2/pi/N) * exp(-i^2/2/N)
-		#expect[i+N+1] = nruns * factorial(big(N)) / factorial(big((N + i) ÷ 2)) / factorial(big((N - i)÷2))/2^N
-	end
-	return PN
+# ╔═╡ 6a35c18f-a9b5-4f64-a039-04825bed56e0
+function e⁻rnd()
+	return 0. - log1p( - rand(Float64) ) 
 end
 
-# ╔═╡ abf5193b-969e-42f2-ab79-23e7debffe27
-@bind ParValues MultiSlider(["p₊", "runs", "steps"],[0:0.01:1, 100:100:10000, 100:100:10000],[0.5, 1000, 1000],[Float64,Int64,Int64])
+# ╔═╡ 7eed9d4c-c9a8-4fa4-8dc6-47edcdb1c8d4
+md"""The next function generates a random variable distributed according to ``p(x) = \frac{a}{\pi}\frac{1}{x^2+a^2}``."""
 
-# ╔═╡ 4dee0990-e92f-4b04-9c23-c813eb0858db
-md"""In the following cell the generation of the ```runs``` iterations of ```steps```-step-long random walks with probability ```pup``` of going in the positive direction is carried out."""
-
-# ╔═╡ 5428fd0a-b58d-40b7-89df-581fed319cd7
-begin
-	steps = Int64(ParValues[3])::Int64
-	steprange = 0:1:steps::Int64
-	runs = Int64(ParValues[2])
-	
-	gotten = fill(0::Int64,2*steps+1)
-	yerr = zeros(Float64,2*steps+1)
-
-	#Initialize experimental results records
-	expxN = fill(0.::Float64,steps+1)
-	expx²N = fill(0.::Float64,steps+1)
-	expΔ²N = fill(0.::Float64,steps+1)
-	expΔΔ²N = fill(0.::Float64,steps+1)
-
-	#Initialize theoretical values records
-	thexN = fill(0.::Float64,steps+1)
-	thex²N = fill(0.::Float64,steps+1)
-	theΔ²N = fill(0.::Float64,steps+1)
-	
-	pup = ParValues[1]
-	xoccN = -steps:2:steps
-	xtotN = -steps:1:steps
-	xiN = zeros(Int64,(5,steps+1))
-	x²iN = zeros(Int64,(5,steps+1))
-
-	rng = MersenneTwister(1234)
-
-	#the expected counts are computed by calling the function introduced previously.
-	expected = PNgen(steps, runs, pup)
-	
-	for irun = 1:1:runs
-
-		if irun <= 5
-			xiN[irun,1] = 0::Int64
-			x²iN[irun,1] = 0::Int64
-		end
-		x = 0::Int64
-		
-		#new seed for each iteration
-		outs = rand(Random.seed!(rng), steps)
-		
-		for jstep = 1:1:steps
-			
-			if outs[jstep] <= pup
-				x += 1
-			else
-				x -= 1
-			end
-			
-			if irun <= 5
-
-				xiN[irun,jstep+1] = x::Int64
-				x²iN[irun,jstep+1] = x^2::Int64
-				
-			end
-			
-			expxN[jstep+1] += x/runs
-			expx²N[jstep+1] += x^2/runs
-		end
-		gotten[steps+1+x] = gotten[steps+1+x] + 1
-	end
-
-	for i in 1:2:2*steps+1
-		yerr[i] = sqrt(expected[i])*sqrt(1-expected[i]/runs)
-	end
-
-	for jstep = 0:1:steps
-
-		#The theoretical 
-		thexN[jstep+1]  = jstep * (2*pup -1)
-		thex²N[jstep+1] = (jstep * (2*pup -1))^2 + 4*pup*(1-pup)*jstep
-		theΔ²N[jstep+1] = 4*pup*(1-pup)*jstep
-		expΔ²N[jstep+1] = expx²N[jstep+1] - expxN[jstep+1]^2
-		expΔΔ²N[jstep+1] = abs(expΔ²N[jstep+1] / theΔ²N[jstep+1] - 1)
-	end
+# ╔═╡ bbcdbb7c-ddea-49d6-b7f7-4fb78ba9ec08
+function Lorrnd() #(a::Float64)
+	return 1. * tan(pi*(rand(Float64) - 1/2)) #1. = a
 end
 
-# ╔═╡ 98da26d8-44e2-4dee-adea-1703added654
-begin
-	Ps.plot(steprange, xiN[1,:], seriestype = :stepmid, label = "1° walk",
-			plot_title = "Average over $(runs) walks and first 5 walks",
-			xaxis = "N", yaxis = "x")
-	Ps.plot!(steprange, xiN[2,:], seriestype = :stepmid, label = "2° walk")
-	Ps.plot!(steprange, xiN[3,:], seriestype = :stepmid, label = "3° walk")
-	Ps.plot!(steprange, xiN[4,:], seriestype = :stepmid, label = "4° walk")
-	Ps.plot!(steprange, xiN[5,:], seriestype = :stepmid, label = "5° walk")
-	Ps.plot!(steprange, expxN, seriestype = :stepmid, linewidth = :3, label = "avg.")
-end
-
-# ╔═╡ de386f90-d00b-426b-83e2-4c0f823fc5f8
-md"""Each run begins with a different seed, generated pseudo-randomly. The results vary, indeed, between different runs and may fluctuate away noticeably from the average value. The fluctuations seem to be greater when the probabilities are well-balanced, and may in general seem not to increase dramatically as it happens in topics of choas theory."""
-
-# ╔═╡ c3f1caec-1c44-4a8a-8883-48c7de74241d
-begin
-	Ps.plot(steprange, expxN, seriestype = :line, label = "avg.",
-			plot_title = "Average over $(runs) walks and theor. displ.",
-			xaxis = "N", yaxis = "displacement")
-	Ps.plot!(steprange, thexN, seriestype = :line, label = "theor.")
-end
-
-# ╔═╡ d4c8c39d-87ab-49cd-b9c9-288997f2cdc5
-Ps.plot(steprange, expxN ./ thexN, seriestype = :line, label = "",
-		plot_title = "Average over $(runs) walks : th. disp. ratio",
-		xaxis = "N", yaxis = "xₑₓₚ/xₜₕ")
-
-# ╔═╡ 9c8040dc-53f7-415d-89be-6acfeab803e1
-md"""Experimental average and theoretical expectation value appear to agree within about 2% of the theoretical value for tests with different values of p₊, especially after about 500 steps."""
-
-# ╔═╡ 9ce133df-225b-44d7-9159-82c71da334a9
-begin
-	Ps.plot(steprange, x²iN[1,:], seriestype = :stepmid, label = "1° walk",
-			plot_title = "Avg. sq. displ. over $(runs) walks and first 5 w.",
-			xaxis = "N", yaxis = "x²")
-	Ps.plot!(steprange, x²iN[2,:], seriestype = :stepmid, label = "2° walk")
-	Ps.plot!(steprange, x²iN[3,:], seriestype = :stepmid, label = "3° walk")
-	Ps.plot!(steprange, x²iN[4,:], seriestype = :stepmid, label = "4° walk")
-	Ps.plot!(steprange, x²iN[5,:], seriestype = :stepmid, label = "5° walk")
-	Ps.plot!(steprange, expx²N, seriestype = :stepmid, linewidth = :3, label = "avg.")
-end
-
-# ╔═╡ 24a8888f-a87f-4000-9806-9c70b441d724
-md"""The fluctuations in the random walks with respect to the average path look amplified in this plot."""
-
-# ╔═╡ 78ff1454-3470-4723-8d9f-16ec131f398a
-begin
-	Ps.plot(plot_title = "Avg. sq. displ. over $(runs) walks and theor.",
-			xaxis = "N", yaxis = "x²")
-	Ps.plot!(steprange, expx²N, seriestype = :line, label = "avg.")
-	Ps.plot!(steprange, thex²N, seriestype = :line, label = "theor.")
-end
-
-# ╔═╡ f5415e15-6105-476c-93c5-00bd509fc676
-begin
-	Ps.plot(plot_title = "Avg. x² over $(runs) walks : th. disp. ratio",
-				xaxis = "N", yaxis = "x²ₑₓₚ/x²ₜₕ")
-	Ps.plot!(steprange, expx²N ./ thex²N, seriestype = :line, label = "")
-end
-
-# ╔═╡ 32b1d1df-8b59-460a-b792-02dee1517f0e
-md"""Indeed, for greater values of the steps, the deviations increase quadratically, so the fluctuations from the average cannot be expected to even out nor the average square distance to stabilize, hence the two curves appeare to part at around 750 counts. Since they both increase, though, their ratio changes more slowly. Nonetheless, their ratio is between 0.9 and 1.1 consistently from 500 steps on."""
-
-# ╔═╡ 5961d503-7071-417b-99cc-11fa1e875205
-begin
-	Ps.plot(plot_title = "Avg. ((x)² - x²) over $(runs) walks and theor.",
-			xaxis = "N", yaxis = "(x)² - x²")
-	Ps.plot!(steprange, expΔ²N, seriestype = :line)
-	Ps.plot!(steprange, theΔ²N, seriestype = :line)#, markershape = :xcross)
-end
-
-# ╔═╡ 66aad91f-3cdb-48b6-a6f4-129873bed3e5
-begin
-	Ps.plot(plot_title = "Avg. sqrt((x)² - x²) over $(runs) walks and th.",
-			xaxis = ("log(N)",:log), yaxis = ("log(sqrt((x)² - x²))",:log))
-	Ps.plot!(steprange[2:end], sqrt.(expΔ²N[2:end]), seriestype = :line)
-	Ps.plot!(steprange[2:end], sqrt.(theΔ²N[2:end]), seriestype = :line)
-end
-
-# ╔═╡ 24d5f74e-44d3-49de-ad55-d2235206cb52
-md"""It `really really` looks like ``\left\langle x_N^2\right\rangle`` depends linearly on ``N``, which is whatas should be expected. Plotting ``\sqrt{\left\langle x_N^2\right\rangle}`` on a log scale, obviously, we see that the ratio y/x will be ``\frac{1}{2}``, as expected."""
-
-# ╔═╡ 2a87cd3a-9325-43e2-9439-08ee4cf481a2
-begin
-	Ps.plot(plot_title = "Avg. ((x)² - x²) over $(runs) walks : th. disp. ratio",
-				xaxis = "N", yaxis = "((x)² - x²)ₑₓₚ/((x)² - x²)ₜₕ")
-	Ps.plot!(steprange, expΔ²N ./ theΔ²N, seriestype = :line)
-end
-
-# ╔═╡ f94da5dd-37d1-4891-96e5-23e4cf599d3f
-begin
-	passinx = findall(x -> x >= 1, gotten)
-	mininx = passinx[1]
-	maxinx = passinx[end]
-	Ps.plot(plot_title = "Counts at $(steps) steps where non trivially zero",
-				xaxis = "x", yaxis = "counts")
-	Ps.plot!(xtotN[mininx:2:maxinx], expected[mininx:2:maxinx], seriestype = :stepmid)
-	Ps.plot!(xtotN[mininx:2:maxinx], gotten[mininx:2:maxinx], yerr=yerr[mininx:2:maxinx], seriestype = :scatter, linewidth = 0.)
-end
-
-# ╔═╡ 1438c87c-c206-45ef-ad2a-28eece30ebb8
-md"""The data agree with the theoretical prediction to within 3 standard deviations in almost all bins."""
-
-# ╔═╡ cdb8109a-1e15-40dc-b598-4ac9806e0a6a
-begin
-	Ps.plot(plot_title = "Rel. dev. of num. value with respect to th. val.",
-			xaxis = "N", yaxis = "|(Δx²)ₑₓₚ / (Δx²)ₜₕ - 1|")
-	Ps.plot!(steprange, expΔΔ²N, seriestype = :line, label = "")
-end
-
-# ╔═╡ c7e5aff7-a82a-4b4c-9945-28a8e5e230f2
-md"""It seems that, indeed, the greater the number of iterations, the smaller the relative deviation expressed as:\
-``$\Delta = \left|\frac{\left\langle(\Delta x_N)^2\right\rangle^{exp}}{\left\langle(\Delta x_N)^2\right\rangle^{the}} - 1\right|\ .$``\
-It seems to us (me) that a number of iterations of about 1000 runs gives results consistently accurate to within about 5% with respect to the expected behaviour.
+# ╔═╡ effed320-42e4-466c-a242-886810c83a62
 """
+This function produces a K-uple of averages x of random variables distributed according to the function f.
 
-# ╔═╡ cc71345f-77ff-447f-b562-259e2c05b8d9
-md"""The next cell implements the expected count, but the formula is approximated with a gaussian."""
+Arguments:
 
-# ╔═╡ 12046d80-3d35-46ee-974f-3209bfd4fe4e
-@bind ParValues2 MultiSlider(["p₊"],[0:0.01:1],[0.5],[Float64,Int64,Int64])
+- N: number of points for the average
 
-# ╔═╡ 9be428da-d8e5-4bf9-8aa4-f8fcf88f29d1
-begin
-	steprange2 = 8:8:64::Int64	
-	pup2 = ParValues2[1]
-	x = []
-	x .= -steprange2:1:steprange2
+- K: number of averages to be generated
 
-	laid = Ps.@layout [a{0.5h, 0.5w} a{0.5h, 0.5w}; a{0.5h, 0.5w} a{0.5h, 0.5w}]
-	plts = [[],[],[],[]]
-	Ps.plot(plot_title = "Comparisons between the distributions",
-			xaxis = "x", yaxis = "P(x)", layout = laid)
-	for i = 1:1:length(plts)
+- f: function which generates the N random variables r of which the average is calculated. If default is left, it generates a variable distributed accordingly to the uniform distribution on [-1,1).
 
-		gauss = GNgen(steprange2[i],1000,pup2)
-		binom = PNgen(steprange2[i],1000,pup2)
+- μ: analytical average of the distribution of the random variable r, produced by f(rand())
+
+- σ: analytical variance of the distribution of the random variable r, produced by f(rand())
+
+-extras: boolean variable that, when "true", triggers the computation of the ratio ⟨z⁴⟩/3/⟨z²⟩, which is the returned as third output
+
+Returns:
+
+- x: list of K averages
+
+- σ: estimate of the standard deviation of the K averages
+
+- ratio ⟨z⁴⟩/3/⟨z²⟩: ratio that should equal 1 for z according to N(0,1)
+"""
+function CLT(N::Int64,K::Int64;f=unipm1::Function,μ₀=0.::Float64,σ₀=1.::Float64,extras=false::Bool)
+	
+	x = zeros(Float64,K)
+	μ = 0.::Float64
+	σ = 0.::Float64
+	z̄⁴ = 0.::Float64
+	z̄² = 0.::Float64
+	for j = 1:1:K
+		xhere = 0.
+		for i = 1:1:N
+			r = f()
+			xhere += r
+		end
+		xhere = xhere/N
+		x[j] = xhere
+		μ = μ + xhere
+		σ = σ + xhere^2
 		
-		plts[i] = Ps.plot!(x, gauss, seriestype = :line, label = "")
-		plts[i] = Ps.plot!(x, binom, seriestype = :line, label = "")
+		if (extras == true)
+			z = (xhere-μ₀)/σ₀
+			z̄⁴ += z^4
+			z̄² += z^2
+		end
+		
 	end
+		
+	μ = μ/K
+	σ = (σ/K-μ^2)*sqrt(K/(K-1))
+	σ = sqrt(σ)
+	
+	if (extras == true)
+		z̄⁴ = z̄⁴/K
+		z̄² = z̄²/K
+		ratio = z̄⁴/3/(z̄²)^2		
+		return x, σ, ratio
+	end
+	
+	if (extras == false)
+		return x, σ
+	end
+		
+	# plot(xₙ,seriestype = :histogram)
+	
 end
 
-# ╔═╡ 93c27874-1b8f-409d-92a3-1835497ea25f
-function GNgen(N, nruns, pup)
-	GN = zeros(Float64,2*N+1)
+# ╔═╡ f6665559-0596-4893-8911-87c08e51400c
+md"""#### Averages of uniform random numbers in ``[-1,+1)``"""
 
-	#Compute the average and the variance:
-	avg = nruns*(2*pup-1)
-	var = 4*pup*(1-pup)*nruns
+# ╔═╡ 3fde6e60-e93b-447b-97dc-908f64938063
+begin
+	N₁ = 500::Int64
+	K₁ = 100::Int64
 
-	for i in -N:1:N
-		GN[i + (N+1)] = exp(-(x-avg)^2/2/var) / sqrt(2*pi*var)
-	end
-	return GN
+	x₁, σ₁, one₁ = CLT(N₁,K₁;μ₀ = 0.,σ₀ = 1/sqrt(3*N₁),extras = true)
+	x̄₁ = sum(x₁)/K₁
+end;
+
+# ╔═╡ 80969c09-7826-4360-a638-7d4857b972ba
+begin
+	x1fmt = @sprintf "%.3f" x̄₁
+	σ1fmt = @sprintf "%.3f" σ₁
+	one1fmt = @sprintf "%.3f" one₁
+
+	#theoretical value
+	σ1th = @sprintf "%.3f" 1/sqrt(3*N₁)
+end;
+
+# ╔═╡ e8482507-5316-4e35-9492-3de4cfb1d350
+md"""The values for ``K`` averages over ``N`` uniform random numbers $r$ in ``[-1,+1)`` we obtained, written as `exp. value` -> `theor. value` are:
+- average: $(x1fmt) -> $(0.);
+- std. dev.: $(σ1fmt) -> $(σ1th);
+- ``\langle z^4\rangle/3\langle z^2\rangle^2``: $(one1fmt) -> 1;
+the theoretical values having been computed respectively as the expectation value of the ``r``s and the std. dev. of the original ``r``s, ``\sqrt{1/3}``, divided by ``\sqrt{N}``, as required by the formula of the propagation of the variance.""" 
+
+# ╔═╡ e16ef0e8-c45d-43d4-9fc1-892d803235af
+begin
+	# Automated histogram generation, from which we get the bins
+	local h = SB.fit(SB.Histogram, x₁)#, nbins=10)
+	local plotrange = h.edges[1]
+
+	# We use the bins to construct the theoretical normalized histogram
+	# using the gaussian error function
+		local σ = 1/sqrt(3*N₁)
+		local Δₚₗₒₜ = plotrange[2]-plotrange[1]
+		
+		# Broadcast the function ''1/2 * (erf((x+Δₚₗₒₜ)/(sqrt(2)*σ))-erf(x/(sqrt(2)*σ)))''
+		# onto the array plotrange[1:end-1] to compute the normalized histogram
+		local plotfunc = broadcast(x -> 1/2 * (SF.erf((x+Δₚₗₒₜ)/(sqrt(2)*σ))-SF.erf(x/(sqrt(2)*σ))), plotrange[1:end-1])
+		
+		local plotcentres = [(plotrange[i]+plotrange[i-1])/2 for i in 2:1:length(plotrange)]
+
+	# Final plot 
+	h = LA.normalize(h; mode=:probability)
+	plot(h)
+	plot!(plotcentres, plotfunc, yerr = sqrt.(plotfunc .* (1 .- plotfunc)/K₁), seriestype = :scatter)
 end
+
+# ╔═╡ 23e4393d-071e-43a8-8a01-f8aabe75b277
+md"""One can see that the experimental values and the theoretical ones seem to be in good agreement with each other. The histogram and the function plot, too, agree within 1-2 standard deviation with each other in most runs, providing evidence for the validity of the Central Limit Theorem."""
+
+# ╔═╡ 19c92928-2f6f-4c3a-9356-9f9a0f1a059e
+md"""#### Averages of random numbers with ``p(x) = e^{-x}``"""
+
+# ╔═╡ 586e6a18-0de3-432d-bfe3-62d9f045b093
+begin
+	N₂ = 500::Int64
+	K₂ = 100::Int64
+
+	x₂, σ₂, one₂ = CLT(N₂,K₂;f=e⁻rnd,μ₀ = 1.,σ₀ = 1/sqrt(N₂), extras = true)
+	x̄₂ = sum(x₂)/K₂
+end;
+
+# ╔═╡ 6c412583-0b52-44c9-ac36-3482d4dc6bf4
+begin
+	# Exp. values that are printed in the next cell
+	x2fmt = @sprintf "%.3f" x̄₂
+	σ2fmt = @sprintf "%.3f" σ₂
+	one2fmt = @sprintf "%.3f" one₂
+
+	# Theoretical value for the std. dev.
+	σ2th = @sprintf "%.3f" 1. /sqrt(N₂)
+end;
+
+# ╔═╡ d958214c-0919-4318-a210-30c86f4e4287
+md"""The values for ``K`` averages over ``N`` random numbers $r$ distributed accordingly to ``p(x)= e^{-x}`` we obtained, written as `exp. value` -> `theor. value` are:
+- average: $(x2fmt) -> $(1.);
+- std. dev.: $(σ2fmt) -> $(σ2th);
+- ``\langle z^4\rangle/3\langle z^2\rangle^2``: $(one2fmt) -> 1;
+the theoretical values having been computed respectively as the expectation value of the ``r``s and the std. dev. of the original ``r``s, ``1``, divided by ``\sqrt{N}``, as required by the formula of the propagation of the variance.""" 
+
+# ╔═╡ 2c99f658-6553-46b3-bfaf-be2eba7f6b00
+begin
+	# Automated histogram generation, from which we get the bins
+	local h = SB.fit(SB.Histogram, x₂)#, nbins=10)
+	local plotrange = h.edges[1]
+
+	# We use the bins to construct the theoretical normalized histogram
+	# using the gaussian error function
+		local σ = 1/sqrt(N₂)
+		local Δₚₗₒₜ = plotrange[2]-plotrange[1]
+		
+		# Broadcast the function ''1/2 * (erf((x+Δₚₗₒₜ)/(sqrt(2)*σ))-erf(x/(sqrt(2)*σ)))''
+		# onto the array plotrange[1:end-1] to compute the normalized histogram
+		local plotfunc = broadcast(x -> 1/2 * (SF.erf((x+Δₚₗₒₜ-1.)/(sqrt(2)*σ))-SF.erf((x-1.)/(sqrt(2)*σ))), plotrange[1:end-1])
+		
+		local plotcentres = [(plotrange[i]+plotrange[i-1])/2 for i in 2:1:length(plotrange)]
+
+	# Final plot 
+	h = LA.normalize(h; mode=:probability)
+	plot(h, label = :"gener. avgs.")
+	plot!(plotcentres, plotfunc, yerr = sqrt.(plotfunc .* (1 .- plotfunc)/K₁), seriestype = :scatter,label = "th. gaussian")
+end
+
+# ╔═╡ 7994fb32-fb09-4ffc-89fa-220b80877baa
+md"""The histogram and the theoretical prediction for the counts for the new gaussian average agree with each other within 1-2 standard deviations on most runs, except for bins with very low counts, providing further evidence for the validity of the Central Limit Theorem."""
+
+# ╔═╡ 82e0bbfc-bd66-45b1-b352-e5ed01093f81
+md"""#### Averages of random numbers with ``p(x) = 1/\pi/(x^2+1)``"""
+
+# ╔═╡ dd8ec463-0ed4-4307-be1a-5de29bee9d0b
+begin
+	N₃ = 500::Int64
+	K₃ = 100::Int64
+	
+	x₃, σ₃ = CLT(N₃,K₃;f = Lorrnd)
+	x̄₃ = sum(x₃)/K₃
+end;
+
+# ╔═╡ 04c1bedd-cf91-4961-ac60-edf9838b1f33
+begin
+	# Exp. values that are printed in the next cell
+	x3fmt = @sprintf "%.3f" x̄₃
+	σ3fmt = @sprintf "%.3f" σ₃
+end;
+
+# ╔═╡ 21f76e2b-61cf-4a66-89ac-2ad905cffca7
+md"""Using the characteristic function of the lorentzian distribution one can show that, if $x$ is distributed accordingly to the lorentzian, which has the characteristic function
+``$\Phi_X(t) = \exp\left(-a|t|\right) = E\left[e^{itx}\right] = \int_{-\infty}^{+\infty} dx\  \frac{a}{\pi}\frac{1}{x^2+a^2}e^{itx}\ ,$``
+the average ``\bar x`` on ``N`` independent ``x``s will be distributed according to a distribution function with characteristic function
+``$\Phi_{\bar X}(t) = E\left[e^{it\bar x}\right]= E\left[e^{it\sum_{j=1}^N x /N}\right] = \left(E\left[e^{itx/N}\right]\right)^N=$``
+``$\left(\int_{-\infty}^{+\infty} dx\  \frac{a/N}{\pi}\frac{1}{x^2+(a/N)^2}e^{itx}\right)^N = \left(\exp\left(-\frac a N|t|\right)\right)^N = \Phi_X(t)\ ,$``
+which means the average itself will be a lorentzian variable with the same parametre ``a`` as the ``x``s from which it was computed."""
+
+# ╔═╡ bc268651-bb54-43dd-9a86-beb57d14feb8
+md"""The values for ``K`` averages over ``N`` random numbers $r$ distributed accordingly to the lorentzian ``p(x) = \frac{1}{\pi}\frac{1}{x^2+1}`` we obtained, written as `exp. value` -> `theor. value` are:
+- average: $(x3fmt) -> $(0.);
+- std. dev.: $(σ3fmt) -> $(Inf);
+the theoretical values having been computed respectively as the expectation value of the ``r``s and the std. dev. of the original ``r``s, ``1``, divided by ``\sqrt{N}``, as required by the formula of the propagation of the variance.""" 
+
+# ╔═╡ 1314029e-483e-4c23-b532-477ad53023fb
+begin
+	# Automated histogram generation, from which we get the bins
+	local h = SB.fit(SB.Histogram, x₃)#, nbins=10)
+	local plotrange = h.edges[1]
+
+	# We use the bins to construct the theoretical normalized histogram
+	# using the gaussian error function
+		local σ = 1/sqrt(N₃)
+		local Δₚₗₒₜ = plotrange[2]-plotrange[1]
+		
+		# Broadcast the function ''1/2 * (erf((x+Δₚₗₒₜ)/(sqrt(2)*σ))-erf(x/(sqrt(2)*σ)))''
+		# onto the array plotrange[1:end-1] to compute the normalized histogram
+		local plotfunc = broadcast(x -> 1/pi * ( atan((x+Δₚₗₒₜ)/1.) - atan(x/1.) ), plotrange[1:end-1])
+		
+		local plotcentres = [(plotrange[i]+plotrange[i-1])/2 for i in 2:1:length(plotrange)]
+
+	# Final plot 
+	h = LA.normalize(h; mode=:probability)
+	plot(h, label = :"gener. avgs.")
+	plot!(plotcentres, plotfunc, yerr = sqrt.(plotfunc .* (1 .- plotfunc)/K₁), seriestype = :scatter,label = "th. lorentzian")
+end
+
+# ╔═╡ aa475b25-1589-4942-8492-61cc23ec4932
+md"""The histogram and the theoretical prediction for the counts for the lorentzian average agree within 1-2 standard deviations with each other on most of the runs, except for bins with very low counts. Comparing the theoretical values to the experimental ones, though, one gets disappointing results because of how likely results far from the average are, which is what causes the value of the variance to be high. One might expect to get better estimates of the average by increasing the number of averages that one generates, but that doesn't seem to happen."""
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
-HypertextLiteral = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
-PlotThemes = "ccf2f8ad-2431-5c83-bf29-c5338b663b6a"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
 Formatting = "~0.4.2"
-HypertextLiteral = "~0.9.3"
-PlotThemes = "~2.0.1"
-Plots = "~1.27.1"
-PlutoUI = "~0.7.37"
+Plots = "~1.27.6"
+PlutoUI = "~0.7.38"
+SpecialFunctions = "~2.1.4"
+StatsBase = "~0.33.16"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -423,9 +383,9 @@ version = "0.12.8"
 
 [[deps.Compat]]
 deps = ["Base64", "Dates", "DelimitedFiles", "Distributed", "InteractiveUtils", "LibGit2", "Libdl", "LinearAlgebra", "Markdown", "Mmap", "Pkg", "Printf", "REPL", "Random", "SHA", "Serialization", "SharedArrays", "Sockets", "SparseArrays", "Statistics", "Test", "UUIDs", "Unicode"]
-git-tree-sha1 = "96b0bc6c52df76506efc8a441c6cf1adcb1babc4"
+git-tree-sha1 = "b153278a25dd42c65abbf4e62344f9d22e59191b"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
-version = "3.42.0"
+version = "3.43.0"
 
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -483,9 +443,9 @@ version = "2.2.3+0"
 
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "ae13fcbc7ab8f16b0856729b050ef0c446aa3492"
+git-tree-sha1 = "bad72f730e9e91c08d9427d5e8db95478a3c323d"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
-version = "2.4.4+0"
+version = "2.4.8+0"
 
 [[deps.FFMPEG]]
 deps = ["FFMPEG_jll"]
@@ -537,15 +497,15 @@ version = "3.3.6+0"
 
 [[deps.GR]]
 deps = ["Base64", "DelimitedFiles", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Pkg", "Printf", "Random", "RelocatableFolders", "Serialization", "Sockets", "Test", "UUIDs"]
-git-tree-sha1 = "9f836fb62492f4b0f0d3b06f55983f2704ed0883"
+git-tree-sha1 = "af237c08bda486b74318c8070adb96efa6952530"
 uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
-version = "0.64.0"
+version = "0.64.2"
 
 [[deps.GR_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "GLFW_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pixman_jll", "Pkg", "Qt5Base_jll", "Zlib_jll", "libpng_jll"]
-git-tree-sha1 = "a6c850d77ad5118ad3be4bd188919ce97fffac47"
+git-tree-sha1 = "cd6efcf9dc746b06709df14e462f0a3fe0786b1e"
 uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
-version = "0.64.0+0"
+version = "0.64.2+0"
 
 [[deps.GeometryBasics]]
 deps = ["EarCut_jll", "IterTools", "LinearAlgebra", "StaticArrays", "StructArrays", "Tables"]
@@ -678,9 +638,9 @@ version = "1.3.0"
 
 [[deps.Latexify]]
 deps = ["Formatting", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "Printf", "Requires"]
-git-tree-sha1 = "4f00cc36fede3c04b8acf9b2e2763decfdcecfa6"
+git-tree-sha1 = "6f14549f7760d84b2db7a9b10b88cd3cc3025730"
 uuid = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
-version = "0.15.13"
+version = "0.15.14"
 
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
@@ -755,9 +715,9 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[deps.LogExpFunctions]]
 deps = ["ChainRulesCore", "ChangesOfVariables", "DocStringExtensions", "InverseFunctions", "IrrationalConstants", "LinearAlgebra"]
-git-tree-sha1 = "58f25e56b706f95125dcb796f39e1fb01d913a71"
+git-tree-sha1 = "a970d55c2ad8084ca317a4658ba6ce99b7523571"
 uuid = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
-version = "0.3.10"
+version = "0.3.12"
 
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
@@ -800,9 +760,9 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 
 [[deps.NaNMath]]
-git-tree-sha1 = "b086b7ea07f8e38cf122f5016af580881ac914fe"
+git-tree-sha1 = "737a5957f387b17e74d4ad2f440eb330b39a62c5"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
-version = "0.3.7"
+version = "1.0.0"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
@@ -817,11 +777,21 @@ version = "1.3.5+1"
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
 
+[[deps.OpenLibm_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
+
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "ab05aa4cc89736e95915b01e7279e61b1bfe33b8"
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
 version = "1.1.14+0"
+
+[[deps.OpenSpecFun_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "13652491f6856acfd2db29360e1bbcd4565d04f1"
+uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
+version = "0.5.5+0"
 
 [[deps.Opus_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -842,9 +812,9 @@ version = "8.44.0+0"
 
 [[deps.Parsers]]
 deps = ["Dates"]
-git-tree-sha1 = "85b5da0fa43588c75bb1ff986493443f821c70b7"
+git-tree-sha1 = "621f4f3b4977325b9128d5fae7a8b4829a0c2222"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.2.3"
+version = "2.2.4"
 
 [[deps.Pixman_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -857,10 +827,10 @@ deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markd
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[deps.PlotThemes]]
-deps = ["PlotUtils", "Requires", "Statistics"]
-git-tree-sha1 = "a3a964ce9dc7898193536002a6dd892b1b5a6f1d"
+deps = ["PlotUtils", "Statistics"]
+git-tree-sha1 = "8162b2f8547bc23876edd0c5181b27702ae58dce"
 uuid = "ccf2f8ad-2431-5c83-bf29-c5338b663b6a"
-version = "2.0.1"
+version = "3.0.0"
 
 [[deps.PlotUtils]]
 deps = ["ColorSchemes", "Colors", "Dates", "Printf", "Random", "Reexport", "Statistics"]
@@ -870,21 +840,21 @@ version = "1.2.0"
 
 [[deps.Plots]]
 deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "GeometryBasics", "JSON", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "Requires", "Scratch", "Showoff", "SparseArrays", "Statistics", "StatsBase", "UUIDs", "UnicodeFun", "Unzip"]
-git-tree-sha1 = "1690b713c3b460c955a2957cd7487b1b725878a7"
+git-tree-sha1 = "6f2dd1cf7a4bbf4f305a0d8750e351cb46dfbe80"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-version = "1.27.1"
+version = "1.27.6"
 
 [[deps.PlutoUI]]
 deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "Markdown", "Random", "Reexport", "UUIDs"]
-git-tree-sha1 = "bf0a1121af131d9974241ba53f601211e9303a9e"
+git-tree-sha1 = "670e559e5c8e191ded66fa9ea89c97f10376bb4c"
 uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
-version = "0.7.37"
+version = "0.7.38"
 
 [[deps.Preferences]]
 deps = ["TOML"]
-git-tree-sha1 = "d3538e7f8a790dc8903519090857ef8e1283eecd"
+git-tree-sha1 = "47e5f437cc0e7ef2ce8406ce1e7e24d44915f88d"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
-version = "1.2.5"
+version = "1.3.0"
 
 [[deps.Printf]]
 deps = ["Unicode"]
@@ -911,9 +881,9 @@ version = "1.2.1"
 
 [[deps.RecipesPipeline]]
 deps = ["Dates", "NaNMath", "PlotUtils", "RecipesBase"]
-git-tree-sha1 = "995a812c6f7edea7527bb570f0ac39d0fb15663c"
+git-tree-sha1 = "dc1e451e15d90347a7decc4221842a022b011714"
 uuid = "01d81517-befc-4cb6-b9ec-a95719d0359c"
-version = "0.5.1"
+version = "0.5.2"
 
 [[deps.Reexport]]
 git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
@@ -967,11 +937,17 @@ version = "1.0.1"
 deps = ["LinearAlgebra", "Random"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
+[[deps.SpecialFunctions]]
+deps = ["ChainRulesCore", "IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
+git-tree-sha1 = "5ba658aeecaaf96923dce0da9e703bd1fe7666f9"
+uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
+version = "2.1.4"
+
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
-git-tree-sha1 = "6976fab022fea2ffea3d945159317556e5dad87c"
+git-tree-sha1 = "4f6ec5d99a28e1a749559ef7dd518663c5eca3d5"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.4.2"
+version = "1.4.3"
 
 [[deps.Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
@@ -979,9 +955,9 @@ uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [[deps.StatsAPI]]
 deps = ["LinearAlgebra"]
-git-tree-sha1 = "c3d8ba7f3fa0625b062b82853a7d5229cb728b6b"
+git-tree-sha1 = "8d7530a38dbd2c397be7ddd01a424e4f411dcc41"
 uuid = "82ae8749-77ed-4fe6-ae5f-f523153014b0"
-version = "1.2.1"
+version = "1.2.2"
 
 [[deps.StatsBase]]
 deps = ["DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunctions", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "StatsAPI"]
@@ -1258,37 +1234,33 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
-# ╟─29850932-aac0-11ec-2223-6b6dea79332d
-# ╟─733fc92a-7723-40b0-b8d3-2defb24a038f
-# ╠═79f6fa94-375d-4d13-b09f-f127e74303b0
-# ╟─bee0e5b3-1ea6-4f20-a1b0-5562c583e64c
-# ╠═a3b60c52-2e25-4fb9-ba36-620ebc193df8
-# ╟─bb721a1b-730a-4ac8-9260-1b3e9dc79e69
-# ╠═18fd5542-d197-4156-8564-847d777de7e1
-# ╠═abf5193b-969e-42f2-ab79-23e7debffe27
-# ╟─4dee0990-e92f-4b04-9c23-c813eb0858db
-# ╠═5428fd0a-b58d-40b7-89df-581fed319cd7
-# ╠═98da26d8-44e2-4dee-adea-1703added654
-# ╟─de386f90-d00b-426b-83e2-4c0f823fc5f8
-# ╠═c3f1caec-1c44-4a8a-8883-48c7de74241d
-# ╠═d4c8c39d-87ab-49cd-b9c9-288997f2cdc5
-# ╟─9c8040dc-53f7-415d-89be-6acfeab803e1
-# ╠═9ce133df-225b-44d7-9159-82c71da334a9
-# ╟─24a8888f-a87f-4000-9806-9c70b441d724
-# ╠═78ff1454-3470-4723-8d9f-16ec131f398a
-# ╠═f5415e15-6105-476c-93c5-00bd509fc676
-# ╟─32b1d1df-8b59-460a-b792-02dee1517f0e
-# ╠═5961d503-7071-417b-99cc-11fa1e875205
-# ╠═66aad91f-3cdb-48b6-a6f4-129873bed3e5
-# ╟─24d5f74e-44d3-49de-ad55-d2235206cb52
-# ╠═2a87cd3a-9325-43e2-9439-08ee4cf481a2
-# ╠═f94da5dd-37d1-4891-96e5-23e4cf599d3f
-# ╟─1438c87c-c206-45ef-ad2a-28eece30ebb8
-# ╠═cdb8109a-1e15-40dc-b598-4ac9806e0a6a
-# ╟─c7e5aff7-a82a-4b4c-9945-28a8e5e230f2
-# ╟─cc71345f-77ff-447f-b562-259e2c05b8d9
-# ╟─93c27874-1b8f-409d-92a3-1835497ea25f
-# ╠═12046d80-3d35-46ee-974f-3209bfd4fe4e
-# ╟─9be428da-d8e5-4bf9-8aa4-f8fcf88f29d1
+# ╟─974ba0dc-274e-4cf9-a17a-ea9aee5de4c9
+# ╠═d9760870-b70a-11ec-0077-6f8c963524a3
+# ╟─c96fc5bd-6707-4113-9931-eec0c7d074c7
+# ╠═1070a66c-ba49-44b0-9920-2a395e780a25
+# ╟─61cc14f6-33d5-40d9-8fa6-d1e9800d8ff9
+# ╠═6a35c18f-a9b5-4f64-a039-04825bed56e0
+# ╟─7eed9d4c-c9a8-4fa4-8dc6-47edcdb1c8d4
+# ╠═bbcdbb7c-ddea-49d6-b7f7-4fb78ba9ec08
+# ╠═effed320-42e4-466c-a242-886810c83a62
+# ╟─f6665559-0596-4893-8911-87c08e51400c
+# ╠═3fde6e60-e93b-447b-97dc-908f64938063
+# ╠═80969c09-7826-4360-a638-7d4857b972ba
+# ╟─e8482507-5316-4e35-9492-3de4cfb1d350
+# ╠═e16ef0e8-c45d-43d4-9fc1-892d803235af
+# ╟─23e4393d-071e-43a8-8a01-f8aabe75b277
+# ╠═19c92928-2f6f-4c3a-9356-9f9a0f1a059e
+# ╠═586e6a18-0de3-432d-bfe3-62d9f045b093
+# ╠═6c412583-0b52-44c9-ac36-3482d4dc6bf4
+# ╟─d958214c-0919-4318-a210-30c86f4e4287
+# ╠═2c99f658-6553-46b3-bfaf-be2eba7f6b00
+# ╟─7994fb32-fb09-4ffc-89fa-220b80877baa
+# ╟─82e0bbfc-bd66-45b1-b352-e5ed01093f81
+# ╠═dd8ec463-0ed4-4307-be1a-5de29bee9d0b
+# ╠═04c1bedd-cf91-4961-ac60-edf9838b1f33
+# ╟─21f76e2b-61cf-4a66-89ac-2ad905cffca7
+# ╟─bc268651-bb54-43dd-9a86-beb57d14feb8
+# ╠═1314029e-483e-4c23-b532-477ad53023fb
+# ╟─aa475b25-1589-4942-8492-61cc23ec4932
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

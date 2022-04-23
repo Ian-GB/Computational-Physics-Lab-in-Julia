@@ -1,23 +1,26 @@
 ### A Pluto.jl notebook ###
-# v0.18.2
+# v0.19.0
 
 using Markdown
 using InteractiveUtils
 
 # ╔═╡ 8b8a5edc-c863-4836-8bb3-62c97251c006
 begin
-	import Pkg; Pkg.add("Plots"); Pkg.add("LaTeXStrings")
+	#import Pkg; Pkg.add("Plots"); Pkg.add("LaTeXStrings")
 	using Random
 	using Formatting
 	using Plots
 	theme(:ggplot2)
 	using LaTeXStrings
-end
+end;
 
 # ╔═╡ b160fd2b-4a91-4cf2-a25e-35632eb83d94
 md"""
-### Unresolved issues:
-- Going to change how IS∫ is implemented so that anything that requires a high number of repetitions will be put inside the function and be optimized as a package by the compiler. One would also want to call a "heavy" function as few times as possibile"""
+# Laboratorio di fisica computazionale
+## Homework 5
+### Author: Ian Gremese
+#### Unresolved issues:
+- Might change how IS∫ is implemented so that anything that requires a high number of repetitions will be put inside the function and be optimized as a package by the compiler. One would also want to call a "heavy" function as few times as possibile"""
 
 # ╔═╡ 0d1f5ab3-c5f1-47e7-8ee1-c29514206574
 md"""This function implements the sample mean integration algorithm."""
